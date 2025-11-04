@@ -6,6 +6,7 @@ import { ParkingSlot as ParkingSlotType, Reservation } from "@/types/parking";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { MapPin } from "lucide-react";
 
 const generateInitialSlots = (): ParkingSlotType[] => {
   const slots: ParkingSlotType[] = [];
@@ -22,7 +23,7 @@ const generateInitialSlots = (): ParkingSlotType[] => {
         status,
         section,
         ...(status === 'occupied' && {
-          vehicleNumber: `MH${12 + sectionIndex}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${1000 + Math.floor(Math.random() * 9000)}`,
+          vehicleNumber: `TN${22 + sectionIndex}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${String.fromCharCode(65 + Math.floor(Math.random() * 26))}${1000 + Math.floor(Math.random() * 9000)}`,
           entryTime: new Date(Date.now() - Math.random() * 3600000 * 5)
         })
       });
@@ -38,6 +39,7 @@ export const ParkingMap = () => {
   const [reservationModalOpen, setReservationModalOpen] = useState(false);
   const [exitModalOpen, setExitModalOpen] = useState(false);
   const [reservations, setReservations] = useState<Map<string, Reservation>>(new Map());
+  const [highlightedSlot, setHighlightedSlot] = useState<string | null>(null);
 
   const handleSlotClick = (slot: ParkingSlotType) => {
     if (slot.status === 'available') {
@@ -94,8 +96,19 @@ export const ParkingMap = () => {
     ));
 
     setReservationModalOpen(false);
+    setHighlightedSlot(selectedSlot.id);
+    
+    // Scroll to the highlighted slot
+    setTimeout(() => {
+      const element = document.getElementById(`slot-${selectedSlot.id}`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+    
+    // Remove highlight after 5 seconds
+    setTimeout(() => setHighlightedSlot(null), 5000);
+    
     toast.success(`Slot ${selectedSlot.slotNumber} reserved successfully!`, {
-      description: `Vehicle: ${vehicleNumber}`
+      description: `Vehicle: ${vehicleNumber} - Navigate to your slot highlighted on the map`
     });
   };
 
@@ -128,14 +141,6 @@ export const ParkingMap = () => {
   const occupiedCount = slots.filter(s => s.status === 'occupied').length;
   const reservedCount = slots.filter(s => s.status === 'reserved').length;
 
-  const groupedSlots = slots.reduce((acc, slot) => {
-    if (!acc[slot.section]) {
-      acc[slot.section] = [];
-    }
-    acc[slot.section].push(slot);
-    return acc;
-  }, {} as Record<string, ParkingSlotType[]>);
-
   return (
     <div className="space-y-6">
       <Card className="p-4">
@@ -155,26 +160,26 @@ export const ParkingMap = () => {
         </div>
       </Card>
 
-      <div className="space-y-8">
-        {Object.entries(groupedSlots).map(([section, sectionSlots]) => (
-          <div key={section} className="space-y-4">
-            <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
-              <Badge variant="outline" className="text-base px-3 py-1">
-                Section {section}
-              </Badge>
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-              {sectionSlots.map(slot => (
-                <ParkingSlot
-                  key={slot.id}
-                  slot={slot}
-                  onClick={() => handleSlotClick(slot)}
-                />
-              ))}
+      <Card className="p-6">
+        <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+          <MapPin className="w-5 h-5" />
+          Parking Map - All Slots
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+          {slots.map(slot => (
+            <div 
+              key={slot.id} 
+              id={`slot-${slot.id}`}
+              className={highlightedSlot === slot.id ? "animate-pulse ring-4 ring-primary rounded-lg" : ""}
+            >
+              <ParkingSlot
+                slot={slot}
+                onClick={() => handleSlotClick(slot)}
+              />
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </Card>
 
       <ReservationModal
         open={reservationModalOpen}
