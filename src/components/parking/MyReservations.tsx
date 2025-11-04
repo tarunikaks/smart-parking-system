@@ -3,17 +3,36 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar, Car, Clock, Navigation, Receipt } from "lucide-react";
+import { Calendar, Car, Clock, Navigation, Receipt, LogOut } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { QRCodeSVG } from 'qrcode.react';
+import { useState, useEffect } from "react";
 
 interface MyReservationsProps {
   reservations: Reservation[];
   onNavigate: (slotId: string) => void;
+  onExitAndPay: (reservation: Reservation) => void;
 }
 
-export const MyReservations = ({ reservations, onNavigate }: MyReservationsProps) => {
+export const MyReservations = ({ reservations, onNavigate, onExitAndPay }: MyReservationsProps) => {
   const activeReservations = reservations.filter(r => r.status === 'active');
   const completedReservations = reservations.filter(r => r.status === 'completed');
+  const [, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const calculateLiveDuration = (entryTime: Date) => {
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - entryTime.getTime()) / (1000 * 60));
+    const hours = Math.floor(diff / 60);
+    const minutes = diff % 60;
+    return `${hours}h ${minutes}m`;
+  };
 
   return (
     <Card className="p-6">
@@ -52,20 +71,44 @@ export const MyReservations = ({ reservations, onNavigate }: MyReservationsProps
                         <Badge variant="default" className="bg-available">Active</Badge>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
-                        <Calendar className="w-4 h-4" />
-                        <span>{formatDistanceToNow(reservation.entryTime, { addSuffix: true })}</span>
+                      <div className="space-y-2 mb-3">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="w-4 h-4" />
+                          <span>{formatDistanceToNow(reservation.entryTime, { addSuffix: true })}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+                          <Clock className="w-4 h-4" />
+                          <span>Duration: {calculateLiveDuration(reservation.entryTime)}</span>
+                        </div>
                       </div>
 
-                      <Button
-                        onClick={() => onNavigate(reservation.slotId)}
-                        className="w-full"
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Navigation className="w-4 h-4 mr-2" />
-                        Navigate to Slot
-                      </Button>
+                      <div className="mb-3 flex justify-center">
+                        <div className="bg-white p-2 rounded-lg shadow-sm">
+                          <QRCodeSVG value={reservation.qrCode} size={120} level="H" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          onClick={() => onNavigate(reservation.slotId)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          <Navigation className="w-4 h-4 mr-2" />
+                          Navigate
+                        </Button>
+                        
+                        <Button
+                          onClick={() => onExitAndPay(reservation)}
+                          variant="default"
+                          size="sm"
+                          className="bg-primary"
+                        >
+                          <LogOut className="w-4 h-4 mr-2" />
+                          Exit & Pay
+                        </Button>
+                      </div>
                     </Card>
                   ))}
                 </div>

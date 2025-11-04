@@ -177,6 +177,14 @@ export const ParkingMap = () => {
     });
   };
 
+  const handleExitFromReservation = (reservation: Reservation) => {
+    const slot = slots.find(s => s.id === reservation.slotId);
+    if (slot) {
+      setSelectedSlot(slot);
+      setExitModalOpen(true);
+    }
+  };
+
   const availableCount = slots.filter(s => s.status === 'available').length;
   const occupiedCount = slots.filter(s => s.status === 'occupied').length;
   const reservedCount = slots.filter(s => s.status === 'reserved').length;
@@ -186,6 +194,7 @@ export const ParkingMap = () => {
       <MyReservations 
         reservations={allReservations} 
         onNavigate={handleNavigateToSlot}
+        onExitAndPay={handleExitFromReservation}
       />
       
       <Card className="p-4">
