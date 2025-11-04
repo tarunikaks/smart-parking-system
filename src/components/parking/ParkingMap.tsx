@@ -2,11 +2,13 @@ import { useState } from "react";
 import { ParkingSlot } from "./ParkingSlot";
 import { ReservationModal } from "./ReservationModal";
 import { ExitModal } from "./ExitModal";
+import { MyReservations } from "./MyReservations";
 import { ParkingSlot as ParkingSlotType, Reservation } from "@/types/parking";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin } from "lucide-react";
+import { calculateFare } from "@/utils/fareCalculator";
 
 const generateInitialSlots = (): ParkingSlotType[] => {
   const slots: ParkingSlotType[] = [];
@@ -39,6 +41,7 @@ export const ParkingMap = () => {
   const [reservationModalOpen, setReservationModalOpen] = useState(false);
   const [exitModalOpen, setExitModalOpen] = useState(false);
   const [reservations, setReservations] = useState<Map<string, Reservation>>(new Map());
+  const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [highlightedSlot, setHighlightedSlot] = useState<string | null>(null);
 
   const handleSlotClick = (slot: ParkingSlotType) => {
@@ -76,12 +79,15 @@ export const ParkingMap = () => {
       slotNumber: selectedSlot.slotNumber,
       vehicleNumber,
       entryTime,
-      qrCode: qrData
+      qrCode: qrData,
+      status: 'active'
     };
 
     const newReservations = new Map(reservations);
     newReservations.set(selectedSlot.id, reservation);
     setReservations(newReservations);
+    
+    setAllReservations(prev => [reservation, ...prev]);
 
     setSlots(slots.map(slot => 
       slot.id === selectedSlot.id 
@@ -115,6 +121,25 @@ export const ParkingMap = () => {
   const handlePayment = () => {
     if (!selectedSlot) return;
 
+    const reservation = reservations.get(selectedSlot.id);
+    if (reservation) {
+      const exitTime = new Date();
+      const duration = Math.floor((exitTime.getTime() - reservation.entryTime.getTime()) / (1000 * 60));
+      const fare = calculateFare(duration);
+      
+      const completedReservation: Reservation = {
+        ...reservation,
+        exitTime,
+        duration,
+        fare,
+        status: 'completed'
+      };
+      
+      setAllReservations(prev => 
+        prev.map(r => r.id === reservation.id ? completedReservation : r)
+      );
+    }
+
     setSlots(slots.map(slot => 
       slot.id === selectedSlot.id 
         ? { 
@@ -137,12 +162,32 @@ export const ParkingMap = () => {
     });
   };
 
+  const handleNavigateToSlot = (slotId: string) => {
+    setHighlightedSlot(slotId);
+    
+    setTimeout(() => {
+      const element = document.getElementById(`slot-${slotId}`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+    
+    setTimeout(() => setHighlightedSlot(null), 5000);
+    
+    toast.info("Navigating to your slot", {
+      description: "Your slot is highlighted on the map"
+    });
+  };
+
   const availableCount = slots.filter(s => s.status === 'available').length;
   const occupiedCount = slots.filter(s => s.status === 'occupied').length;
   const reservedCount = slots.filter(s => s.status === 'reserved').length;
 
   return (
     <div className="space-y-6">
+      <MyReservations 
+        reservations={allReservations} 
+        onNavigate={handleNavigateToSlot}
+      />
+      
       <Card className="p-4">
         <div className="flex flex-wrap gap-4 justify-center">
           <Badge variant="outline" className="gap-2 px-4 py-2 text-sm bg-available/20 border-available">

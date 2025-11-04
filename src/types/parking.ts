@@ -10,6 +10,8 @@ export interface ParkingSlot {
   section: string;
 }
 
+export type BookingStatus = 'active' | 'completed';
+
 export interface Reservation {
   id: string;
   slotId: string;
@@ -20,4 +22,5 @@ export interface Reservation {
   duration?: number;
   fare?: number;
   qrCode: string;
+  status: BookingStatus;
 }
