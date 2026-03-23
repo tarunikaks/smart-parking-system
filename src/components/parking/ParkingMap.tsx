@@ -3,12 +3,16 @@ import { ParkingSlot } from "./ParkingSlot";
 import { ReservationModal } from "./ReservationModal";
 import { ExitModal } from "./ExitModal";
 import { MyReservations } from "./MyReservations";
+import { MallMapModal } from "./MallMapModal";
+import { PaymentReceiptModal } from "./PaymentReceiptModal";
+import { AnalyticsDashboard } from "./AnalyticsDashboard";
 import { ParkingSlot as ParkingSlotType, Reservation } from "@/types/parking";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin } from "lucide-react";
 import { calculateFare } from "@/utils/fareCalculator";
+import { supabase } from "@/integrations/supabase/client";
 
 const generateInitialSlots = (): ParkingSlotType[] => {
   const slots: ParkingSlotType[] = [];
@@ -43,6 +47,10 @@ export const ParkingMap = () => {
   const [reservations, setReservations] = useState<Map<string, Reservation>>(new Map());
   const [allReservations, setAllReservations] = useState<Reservation[]>([]);
   const [highlightedSlot, setHighlightedSlot] = useState<string | null>(null);
+  const [mallMapOpen, setMallMapOpen] = useState(false);
+  const [mallMapSlot, setMallMapSlot] = useState<{ slotNumber: string; section: string }>({ slotNumber: '', section: '' });
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receipt, setReceipt] = useState<any>(null);
 
   const handleSlotClick = (slot: ParkingSlotType) => {
     if (slot.status === 'available') {
@@ -91,26 +99,18 @@ export const ParkingMap = () => {
 
     setSlots(slots.map(slot => 
       slot.id === selectedSlot.id 
-        ? { 
-            ...slot, 
-            status: 'occupied',
-            vehicleNumber,
-            entryTime,
-            reservationId
-          }
+        ? { ...slot, status: 'occupied', vehicleNumber, entryTime, reservationId }
         : slot
     ));
 
     setReservationModalOpen(false);
     setHighlightedSlot(selectedSlot.id);
     
-    // Scroll to the highlighted slot
     setTimeout(() => {
       const element = document.getElementById(`slot-${selectedSlot.id}`);
       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
     
-    // Remove highlight after 5 seconds
     setTimeout(() => setHighlightedSlot(null), 5000);
     
     toast.success(`Slot ${selectedSlot.slotNumber} reserved successfully!`, {
@@ -118,37 +118,54 @@ export const ParkingMap = () => {
     });
   };
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
     if (!selectedSlot) return;
 
     const reservation = reservations.get(selectedSlot.id);
-    if (reservation) {
-      const exitTime = new Date();
-      const duration = Math.floor((exitTime.getTime() - reservation.entryTime.getTime()) / (1000 * 60));
-      const fare = calculateFare(duration);
-      
-      const completedReservation: Reservation = {
-        ...reservation,
-        exitTime,
-        duration,
-        fare,
-        status: 'completed'
-      };
-      
-      setAllReservations(prev => 
-        prev.map(r => r.id === reservation.id ? completedReservation : r)
-      );
+    if (!reservation) return;
+
+    const exitTime = new Date();
+    const duration = Math.floor((exitTime.getTime() - reservation.entryTime.getTime()) / (1000 * 60));
+    const fare = calculateFare(duration);
+
+    // Call payment processing edge function
+    try {
+      const { data, error } = await supabase.functions.invoke('process-payment', {
+        body: {
+          reservationId: reservation.id,
+          slotNumber: reservation.slotNumber,
+          vehicleNumber: reservation.vehicleNumber,
+          durationMinutes: duration,
+          fare,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        setReceipt(data.receipt);
+        setReceiptModalOpen(true);
+      }
+    } catch (err) {
+      console.error('Payment processing error:', err);
+      // Fallback to local processing
     }
+
+    const completedReservation: Reservation = {
+      ...reservation,
+      exitTime,
+      duration,
+      fare,
+      status: 'completed'
+    };
+    
+    setAllReservations(prev => 
+      prev.map(r => r.id === reservation.id ? completedReservation : r)
+    );
 
     setSlots(slots.map(slot => 
       slot.id === selectedSlot.id 
-        ? { 
-            ...slot, 
-            status: 'available',
-            vehicleNumber: undefined,
-            entryTime: undefined,
-            reservationId: undefined
-          }
+        ? { ...slot, status: 'available', vehicleNumber: undefined, entryTime: undefined, reservationId: undefined }
         : slot
     ));
 
@@ -163,18 +180,18 @@ export const ParkingMap = () => {
   };
 
   const handleNavigateToSlot = (slotId: string) => {
+    const slot = slots.find(s => s.id === slotId);
+    if (slot) {
+      setMallMapSlot({ slotNumber: slot.slotNumber, section: slot.section });
+      setMallMapOpen(true);
+    }
+
     setHighlightedSlot(slotId);
-    
     setTimeout(() => {
       const element = document.getElementById(`slot-${slotId}`);
       element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 100);
-    
     setTimeout(() => setHighlightedSlot(null), 5000);
-    
-    toast.info("Navigating to your slot", {
-      description: "Your slot is highlighted on the map"
-    });
   };
 
   const handleExitFromReservation = (reservation: Reservation) => {
@@ -196,6 +213,8 @@ export const ParkingMap = () => {
         onNavigate={handleNavigateToSlot}
         onExitAndPay={handleExitFromReservation}
       />
+
+      <AnalyticsDashboard slots={slots} reservations={allReservations} />
       
       <Card className="p-4">
         <div className="flex flex-wrap gap-4 justify-center">
@@ -217,8 +236,9 @@ export const ParkingMap = () => {
       <Card className="p-6">
         <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
           <MapPin className="w-5 h-5" />
-          Parking Map - All Slots
+          Phoenix MarketCity - Parking Map
         </h3>
+        <p className="text-sm text-muted-foreground mb-4">Velachery, Chennai • Basement Parking</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
           {slots.map(slot => (
             <div 
@@ -247,6 +267,19 @@ export const ParkingMap = () => {
         onClose={() => setExitModalOpen(false)}
         reservation={selectedSlot ? reservations.get(selectedSlot.id) || null : null}
         onPayment={handlePayment}
+      />
+
+      <MallMapModal
+        open={mallMapOpen}
+        onClose={() => setMallMapOpen(false)}
+        slotNumber={mallMapSlot.slotNumber}
+        section={mallMapSlot.section}
+      />
+
+      <PaymentReceiptModal
+        open={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        receipt={receipt}
       />
     </div>
   );
