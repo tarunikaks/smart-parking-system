@@ -5,7 +5,7 @@ import { QRCodeDisplay } from "./QRCodeDisplay";
 import { calculateFare, formatDuration, formatCurrency } from "@/utils/fareCalculator";
 import { Reservation } from "@/types/parking";
 import { Clock, IndianRupee, Calendar } from "lucide-react";
-import parkingSlotImage from "@/assets/parking-slot-outline.png";
+
 
 interface ExitModalProps {
   open: boolean;
