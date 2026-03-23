@@ -96,16 +96,6 @@ export const ExitModal = ({ open, onClose, reservation, onPayment }: ExitModalPr
               </div>
             </div>
 
-            <div className="border rounded-lg overflow-hidden">
-              <img 
-                src={parkingSlotImage} 
-                alt="Parking Slot Layout" 
-                className="w-full h-auto"
-              />
-              <div className="p-2 bg-muted text-center text-xs text-muted-foreground">
-                Your slot: {reservation.slotNumber}
-              </div>
-            </div>
           </div>
         </div>
 
