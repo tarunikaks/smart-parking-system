@@ -58,7 +58,7 @@ export const ReservationModal = ({ open, onClose, slotNumber, onConfirm }: Reser
             <Label htmlFor="vehicleNumber">Vehicle Number</Label>
             <Input
               id="vehicleNumber"
-              placeholder="e.g., MH01AB1234"
+              placeholder="e.g., TN22AB1234"
               value={vehicleNumber}
               onChange={(e) => {
                 setVehicleNumber(e.target.value);
